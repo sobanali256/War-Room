@@ -1,0 +1,48 @@
+from crewai import Task
+
+class WarRoomTasks:
+    def attack_task(self, agent, contract_text, counter_party):
+        return Task(
+            description=f"""Analyze the following contract text with the mindset of a high-pressure corporate negotiator representing {counter_party}:
+            '{contract_text}'
+            
+            Your objectives:
+            1. Analyze language for vulnerabilities, vague wording, or exploitable gaps.
+            2. Identify opportunities to shift liabilities away from {counter_party}.
+            3. Draft a 'Red Report' that pushes for broadened indemnities and loosened obligations for your side.
+            4. Frame adversarial arguments to weaken any existing protections for the other party.
+            """,
+            agent=agent,
+            expected_output=f"A markdown 'Red Report' detailing aggressive demands, exploitable gaps, and strategic leverage points favoring {counter_party}."
+        )
+
+    def defense_task(self, agent, contract_text, context, user_role):
+        return Task(
+            description=f"""Review the contract: '{contract_text}'
+            AND the 'Red Report' provided by The Shark.
+            
+            Your objectives:
+            1. Identify hidden threats and ambiguous obligations that harm {user_role}.
+            2. Challenge the Shark's aggressive clauses with reasoned counterpositions.
+            3. Propose strong protective alternatives (limiting liability, securing safeguards).
+            4. Ensure {user_role} is not placed in a vulnerable position.
+            """,
+            agent=agent,
+            context=context,
+            expected_output=f"A markdown 'Blue Report' containing risk mitigation strategies, strong protective clauses, and a defense against the Shark's claims for {user_role}."
+        )
+
+    def verdict_task(self, agent, contract_text, context):
+        return Task(
+            description=f"""Review the original contract, the Shark's Red Report, and the Shield's Blue Report.
+            
+            Your objectives:
+            1. Filter out the extremes from both sides (Shark's aggression vs Shield's over-caution).
+            2. Determine which arguments are legally valid and commercially reasonable.
+            3. Draft a final version that creates a fair, market-standard structure.
+            4. Ensure the final clauses withstand legal scrutiny and practical application.
+            """,
+            agent=agent,
+            context=context,
+            expected_output="A Final Verdict explaining the compromise and providing the specific, rewritten contract clauses that represent the optimal midpoint."
+        )

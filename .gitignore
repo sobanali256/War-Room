@@ -1,0 +1,19 @@
+# 1. Security (CRITICAL)
+.env
+
+# 2. Virtual Environment (Do not upload library files)
+venv/
+env/
+.venv/
+
+# 3. Python Cache (Junk files created automatically)
+__pycache__/
+*.pyc
+
+# 4. Operating System Junk
+.DS_Store
+Thumbs.db
+
+# 5. Local Test Files (Optional: Don't upload your test contracts)
+*.pdf
+*.txt
