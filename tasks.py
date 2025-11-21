@@ -1,6 +1,8 @@
 from crewai import Task
+import os
 
 class WarRoomTasks:
+    
     def attack_task(self, agent, contract_text, counter_party):
         return Task(
             description=f"""Analyze the following contract text with the mindset of a high-pressure corporate negotiator representing {counter_party}:
@@ -13,7 +15,8 @@ class WarRoomTasks:
             4. Frame adversarial arguments to weaken any existing protections for the other party.
             """,
             agent=agent,
-            expected_output=f"A markdown 'Red Report' detailing aggressive demands, exploitable gaps, and strategic leverage points favoring {counter_party}."
+            expected_output=f"A markdown 'Red Report' detailing aggressive demands, exploitable gaps, and strategic leverage points favoring {counter_party}.",
+            output_file=os.path.join(os.getcwd(), "shark_output.md")
         )
 
     def defense_task(self, agent, contract_text, context, user_role):
@@ -29,7 +32,8 @@ class WarRoomTasks:
             """,
             agent=agent,
             context=context,
-            expected_output=f"A markdown 'Blue Report' containing risk mitigation strategies, strong protective clauses, and a defense against the Shark's claims for {user_role}."
+            expected_output=f"A markdown 'Blue Report' containing risk mitigation strategies, strong protective clauses, and a defense against the Shark's claims for {user_role}.",
+            output_file=os.path.join(os.getcwd(), "shield_output.md")
         )
 
     def verdict_task(self, agent, contract_text, context):
@@ -44,5 +48,6 @@ class WarRoomTasks:
             """,
             agent=agent,
             context=context,
-            expected_output="A Final Verdict explaining the compromise and providing the specific, rewritten contract clauses that represent the optimal midpoint."
+            expected_output="A Final Verdict explaining the compromise and providing the specific, rewritten contract clauses that represent the optimal midpoint.",
+            output_file=os.path.join(os.getcwd(), "verdict_output.md")
         )
