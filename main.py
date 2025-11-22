@@ -1,6 +1,6 @@
 import streamlit as st
 from crew import WarRoomCrew
-from utils import identify_roles
+from utils import analyze_contract
 from pypdf import PdfReader
 from fpdf import FPDF
 
@@ -15,7 +15,7 @@ st.markdown("""
     .shark-card { background: linear-gradient(145deg, #2b1111, #1a0b0b); border-left: 4px solid #ff4b4b; color: #e0e0e0; }
     .shield-card { background: linear-gradient(145deg, #0b1221, #080d16); border-left: 4px solid #4b7bff; color: #e0e0e0; }
     .mediator-card { background: linear-gradient(145deg, #0f2615, #09140b); border: 1px solid #21c354; padding: 25px; color: #ffffff; }
-    .role-badge { background-color: #262730; padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+    .role-badge { background-color: #262730; padding: 10px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #4a4a4a; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -30,10 +30,7 @@ def create_pdf(text):
     pdf = PDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    
-    # Sanitize text (remove emojis/complex chars that break basic PDFs)
     safe_text = text.encode('latin-1', 'replace').decode('latin-1')
-    
     pdf.multi_cell(0, 10, safe_text)
     return pdf.output(dest='S').encode('latin-1')
 
@@ -43,7 +40,7 @@ def get_pdf_text(uploaded_file):
     try:
         pdf_reader = PdfReader(uploaded_file)
         for i, page in enumerate(pdf_reader.pages):
-            if i >= 5: break
+            if i >= 5: break 
             text += page.extract_text()
     except Exception as e:
         st.error(f"Error reading PDF: {e}")
@@ -52,14 +49,15 @@ def get_pdf_text(uploaded_file):
 
 # --- MAIN UI ---
 st.title("⚖️ The War Room")
+st.caption("Autonomous Multi-Agent Contract Defense System")
 
 # Sidebar
 with st.sidebar:
     st.header("📁 Case Files")
     uploaded_file = st.file_uploader("Upload Contract (PDF)", type=['pdf'])
+    st.markdown("---")
     st.caption("⚡ Model: GPT-4o-mini")
-
-    # Reset Button (To clear history)
+    
     if st.button("🔄 Reset Simulation"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -67,56 +65,80 @@ with st.sidebar:
 
 # Main Logic
 if uploaded_file:
-    # 1. Role Detection (Cached)
+    # 1. Analysis Phase
     if 'roles' not in st.session_state:
-        with st.spinner("🔍 Analyzing Roles..."):
+        with st.spinner("🔍 Analyzing Roles & Risk Profile..."):
             contract_text = get_pdf_text(uploaded_file)
-            st.session_state['roles'] = identify_roles(contract_text)
             st.session_state['contract_text'] = contract_text
+            
+            analysis_result = analyze_contract(contract_text)
+            st.session_state['roles'] = analysis_result['roles']
+            st.session_state['risk_scores'] = analysis_result['risk_scores']
     
     roles = st.session_state['roles']
+    scores = st.session_state['risk_scores']
+
+    # --- RISK DASHBOARD ---
+    st.markdown("### 📊 Risk Assessment")
+    kpi1, kpi2, kpi3 = st.columns(3)
     
-    # Show Roles
+    def get_color(score):
+        if score < 30: return "normal"
+        if score < 70: return "off"
+        return "inverse"
+    
+    kpi1.metric(label="Liability Exposure", value=f"{scores['liability_score']}/100", delta_color=get_color(scores['liability_score']))
+    kpi2.metric(label="Financial Risk", value=f"{scores['financial_risk']}/100", delta_color=get_color(scores['financial_risk']))
+    kpi3.metric(label="Unfairness Score", value=f"{scores['unfairness_score']}/100", delta_color=get_color(scores['unfairness_score']))
+    st.warning(f"⚠️ **Key Red Flag:** {scores['summary']}")
+    st.divider()
+
+    # --- ROLE DISPLAY ---
     c1, c2 = st.columns(2)
     c1.markdown(f"<div class='role-badge'>🔵 <b>Us:</b> {roles['user_name']}</div>", unsafe_allow_html=True)
     c2.markdown(f"<div class='role-badge'>🔴 <b>Them:</b> {roles['counter_party_name']}</div>", unsafe_allow_html=True)
 
-    # 2. Run Simulation (Only if not already run)
+    # 2. Run Simulation
     if 'simulation_results' not in st.session_state:
         if st.button("⚔️ Enter The Arena", type="primary", use_container_width=True):
-            with st.spinner("⚔️ Agents are debating..."):
+            with st.spinner("⚔️ Agents are debating... (This takes ~45s)"):
                 try:
                     war_room = WarRoomCrew(
                         st.session_state['contract_text'][:5000], 
                         roles['user_role'], 
                         roles['counter_party']
                     )
-                    # Save results to Session State
                     st.session_state['simulation_results'] = war_room.run()
-                    st.rerun() # Force refresh to show results
+                    st.rerun()
                 except Exception as e:
-                    st.error(f"Failed: {e}")
+                    st.error(f"Simulation Failed: {e}")
 
-    # 3. Display Results (From Session State)
+    # 3. Display Results
     if 'simulation_results' in st.session_state:
         results = st.session_state['simulation_results']
         
+        # Sanitization
+        shark_text = str(results['shark_report']).replace("undefined", "").strip()
+        shield_text = str(results['shield_report']).replace("undefined", "").strip()
+        verdict_text = str(results['final_verdict']).replace("undefined", "").strip()
+        
+        # The Debate
         st.markdown("### 🗣️ The Debate")
         col_shark, col_shield = st.columns(2)
         with col_shark:
             st.markdown(f"#### 🦈 The Shark")
-            st.markdown(f"<div class='st-card shark-card'>{results['shark_report']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='st-card shark-card'>{shark_text}</div>", unsafe_allow_html=True)
         with col_shield:
             st.markdown(f"#### 🛡️ The Shield")
-            st.markdown(f"<div class='st-card shield-card'>{results['shield_report']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='st-card shield-card'>{shield_text}</div>", unsafe_allow_html=True)
 
+        # The Verdict
         st.divider()
         st.markdown("### 🏛️ Final Verdict")
-        st.markdown(f"<div class='mediator-box mediator-card'>{results['final_verdict']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='mediator-box mediator-card'>{verdict_text}</div>", unsafe_allow_html=True)
 
-        # 4. PDF Download Button
-        pdf_data = create_pdf(results['final_verdict'])
-        
+        # PDF Download
+        pdf_data = create_pdf(verdict_text)
         st.download_button(
             label="📥 Download PDF Verdict",
             data=pdf_data,

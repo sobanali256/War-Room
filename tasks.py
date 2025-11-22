@@ -51,3 +51,4 @@ class WarRoomTasks:
             expected_output="A Final Verdict explaining the compromise and providing the specific, rewritten contract clauses that represent the optimal midpoint.",
             output_file=os.path.join(os.getcwd(), "verdict_output.md")
         )
+    
