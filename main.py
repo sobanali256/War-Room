@@ -33,6 +33,7 @@ st.markdown("""
     .shark-card { background: linear-gradient(145deg, #2b1111, #1a0b0b); border-left: 6px solid #ff4b4b; color: #f2c6c6; }
     .shield-card { background: linear-gradient(145deg, #0b1221, #080d16); border-left: 6px solid #4b7bff; color: #c6d5f2; }
     .mediator-card { background: linear-gradient(145deg, #0f2615, #09140b); border: 2px solid #21c354; padding: 25px; color: #b8e6b8; }
+    .negotiator-card { background: linear-gradient(145deg, #2d2d1d, #1f1f14); border-left: 6px solid #f1c40f; color: #f9e79f; }
     
     /* Role & Dashboard Badges */
     .role-badge { background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; font-size: 1.1em; text-align: center; border: 1px solid #444; }
@@ -57,28 +58,20 @@ st.markdown("""
 # --- HELPER FUNCTIONS ---
 
 def clean_text(text):
-    """
-    Sanitizes LLM output to remove artifacts like 'undefined', 'null', 
-    or markdown code blocks that shouldn't be there.
-    """
+    """Sanitizes LLM output to remove artifacts."""
     if not isinstance(text, str):
         return str(text)
-    
-    # Remove "undefined" or "null" if they appear as standalone lines or words
     text = text.replace("undefined", "").replace("null", "")
-    
-    # Remove backticks if the model wrapped the "undefined" in code blocks
     text = text.replace("```", "").replace("`", "")
-    
     return text.strip()
 
 def get_pdf_text(uploaded_file):
-    """Extracts text from the uploaded PDF (limit 10 pages)."""
+    """Extracts text from the uploaded PDF (limit 30 pages)."""
     text = ""
     try:
         pdf_reader = PdfReader(uploaded_file)
         for i, page in enumerate(pdf_reader.pages):
-            if i >= 30: break 
+            if i >= 30: break # Increased limit
             text += page.extract_text()
     except Exception as e:
         st.error(f"Error reading PDF: {e}")
@@ -96,7 +89,6 @@ def create_pdf(text):
     pdf = PDF()
     pdf.add_page()
     pdf.set_font("Arial", size=11)
-    # Ensure text is clean before printing to PDF
     safe_text = clean_text(text).encode('latin-1', 'replace').decode('latin-1')
     pdf.multi_cell(0, 10, safe_text)
     return pdf.output(dest='S').encode('latin-1')
@@ -127,10 +119,9 @@ if uploaded_file:
             if text:
                 st.session_state['contract_text'] = text
                 
-                # CALL BACKEND: Analyze Contract
+                # CALL BACKEND: Analyze Contract (Send first 10k chars for risk analysis)
                 try:
-                    # Expected format: {'roles': {...}, 'risk_scores': {...}}
-                    analysis_result = analyze_contract(text)
+                    analysis_result = analyze_contract(text[:10000]) 
                     st.session_state['roles'] = analysis_result.get('roles', {})
                     st.session_state['risk_scores'] = analysis_result.get('risk_scores', {})
                 except Exception as e:
@@ -142,16 +133,15 @@ if uploaded_file:
         roles = st.session_state['roles']
         scores = st.session_state['risk_scores']
         
-        # --- ORIGINAL RISK DASHBOARD (Restored) ---
+        # --- RISK DASHBOARD ---
         st.markdown("### 📊 Risk Assessment")
         kpi1, kpi2, kpi3 = st.columns(3)
         
         def get_color(score):
-            if score < 30: return "normal"   # Greenish
-            if score < 70: return "off"      # Grey/Neutral
-            return "inverse"                 # Red (High Alert)
+            if score < 30: return "normal"
+            if score < 70: return "off"
+            return "inverse"
         
-        # Fallbacks added in case backend returns None for scores
         l_score = scores.get('liability_score', 0)
         f_score = scores.get('financial_risk', 0)
         u_score = scores.get('unfairness_score', 0)
@@ -176,12 +166,12 @@ if uploaded_file:
         
         if 'simulation_results' not in st.session_state:
             if st.button("🚀 Enter The Arena (Run AI Agents)", type="primary", use_container_width=True):
-                with st.spinner("🧠 Agents are debating strategies..."):
+                with st.spinner("🧠 Agents are debating & drafting strategy..."):
                     try:
                         user_role = roles.get('user_role', 'Tenant')
                         counter_role = roles.get('counter_party', 'Landlord')
                         
-                        # Initialize Crew
+                        # Initialize Crew with INCREASED Character Limit (25k)
                         war_room = WarRoomCrew(
                             st.session_state['contract_text'][:25000], 
                             user_role, 
@@ -194,7 +184,7 @@ if uploaded_file:
                     except Exception as e:
                         st.error(f"Simulation Error: {e}")
 
-        # 4. DISPLAY RESULTS (TABS IMPLEMENTATION)
+        # 4. DISPLAY RESULTS (4 TABS)
         if 'simulation_results' in st.session_state:
             results = st.session_state['simulation_results']
             
@@ -203,13 +193,15 @@ if uploaded_file:
                 shark_text = clean_text(results.get('shark_report', "No report generated."))
                 shield_text = clean_text(results.get('shield_report', "No report generated."))
                 verdict_text = clean_text(results.get('final_verdict', str(results)))
+                negotiation_text = clean_text(results.get('negotiation_strategy', "No strategy generated."))
             else:
                 shark_text = "See Mediator Verdict."
                 shield_text = "See Mediator Verdict."
                 verdict_text = clean_text(str(results))
+                negotiation_text = "Strategy not available."
 
             # TABS Layout
-            tab_shark, tab_shield, tab_mediator = st.tabs(["🦈 The Shark", "🛡️ The Shield", "⚖️ The Mediator"])
+            tab_shark, tab_shield, tab_mediator, tab_coach = st.tabs(["🦈 The Shark", "🛡️ The Shield", "⚖️ The Mediator", "🤝 The Coach"])
 
             with tab_shark:
                 st.markdown("#### 🔴 Aggressive Strategy")
@@ -222,10 +214,7 @@ if uploaded_file:
             with tab_mediator:
                 st.markdown("#### 🟢 Final Consensus")
                 st.markdown(f"<div class='st-card mediator-card'>{verdict_text}</div>", unsafe_allow_html=True)
-                
                 st.divider()
-                
-                # PDF Generation
                 pdf_data = create_pdf(verdict_text)
                 st.download_button(
                     label="📥 Download Final Verdict (PDF)",
@@ -234,6 +223,10 @@ if uploaded_file:
                     mime="application/pdf",
                     use_container_width=True
                 )
+            
+            with tab_coach:
+                st.markdown("#### 🤝 Negotiation Playbook")
+                st.markdown(f"<div class='st-card negotiator-card'>{negotiation_text}</div>", unsafe_allow_html=True)
 
 else:
     # Empty State

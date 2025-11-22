@@ -16,16 +16,18 @@ class WarRoomCrew:
         shark = self.agents.shark_agent(self.counter_party)
         shield = self.agents.shield_agent(self.user_role)
         mediator = self.agents.mediator_agent()
+        negotiator = self.agents.negotiator_agent()
 
         # 2. Init Tasks
         attack = self.tasks.attack_task(shark, self.contract_text, self.counter_party)
         defense = self.tasks.defense_task(shield, self.contract_text, [attack], self.user_role)
         verdict = self.tasks.verdict_task(mediator, self.contract_text, [attack, defense])
+        negotiation = self.tasks.negotiation_task(negotiator, [verdict], self.user_role, self.counter_party)
 
-        # 3. Run Crew
+        # 3. Run Crew (Sequential Flow)
         crew = Crew(
-            agents=[shark, shield, mediator],
-            tasks=[attack, defense, verdict],
+            agents=[shark, shield, mediator, negotiator],
+            tasks=[attack, defense, verdict, negotiation],
             process=Process.sequential,
             verbose=True
         )
@@ -42,7 +44,7 @@ class WarRoomCrew:
                 if hasattr(task_output, 'result'):
                     return clean_garbage(str(task_output.result))
             except Exception as e:
-                print(f"Memory read failed: {e}")
+                print(f"Memory read failed for {filename}: {e}")
 
             # Priority 2: Read the File
             try:
@@ -50,20 +52,21 @@ class WarRoomCrew:
                     with open(filename, "r", encoding='utf-8') as f:
                         return clean_garbage(f.read())
             except Exception as e:
-                print(f"File read failed: {e}")
+                print(f"File read failed for {filename}: {e}")
 
             return "⚠️ Simulation Error: Output not generated. Please check terminal logs."
 
-        # 5. Garbage Cleaner (Removes the 'description=' text if it appears)
+        # 5. Garbage Cleaner
         def clean_garbage(text):
             text = str(text)
             if text.strip().startswith("description=") or "description='" in text:
                 return "⚠️ Data Cleaning Error: The agent returned metadata instead of text. Check terminal for raw output."
             return text
 
-        # Return using INDEX (0=Shark, 1=Shield, 2=Mediator)
+        # Return using INDEX (0=Shark, 1=Shield, 2=Mediator, 3=Negotiator)
         return {
             "shark_report": get_output(0, "shark_output.md"),
             "shield_report": get_output(1, "shield_output.md"),
-            "final_verdict": get_output(2, "verdict_output.md")
+            "final_verdict": get_output(2, "verdict_output.md"),
+            "negotiation_strategy": get_output(3, "negotiation_output.md")
         }

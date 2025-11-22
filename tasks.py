@@ -52,3 +52,24 @@ class WarRoomTasks:
             output_file=os.path.join(os.getcwd(), "verdict_output.md")
         )
     
+    def negotiation_task(self, agent, context, user_role, counter_party):
+        return Task(
+            description=f"""
+            Review the 'Final Verdict' provided by the Mediator.
+            Your goal is to prepare {user_role} to negotiate these terms with {counter_party}.
+            
+            Create a 'Negotiation Playbook' that includes:
+            1. **The BATNA Assessment**: Estimate the Best Alternative to a Negotiated Agreement for both sides. 
+               (e.g., "If they walk away, they lose X...").
+            2. **The 'Ask' Script**: Specific, professional phrasing for how {user_role} should propose the new clauses 
+               without sounding aggressive.
+            3. **Objection Handling**: Anticipate the 3 most likely complaints {counter_party} will have. 
+               Write out exact "Counter-Scripts" for {user_role} to use in response.
+            4. **The 'Give-Get' Strategy**: Identify 'Throwaway Clauses' (things we can concede) to protect the 'Must-Haves'.
+            """,
+            agent=agent,
+            context=context, # This passes the Mediator's Verdict to this task
+            expected_output="A Markdown-formatted Negotiation Playbook containing scripts, BATNA analysis, and rebuttal strategies.",
+            output_file=os.path.join(os.getcwd(), "negotiation_output.md")
+        )
+    

@@ -75,3 +75,19 @@ class WarRoomAgents:
             verbose=True,
             allow_delegation=False
         )
+    
+    def negotiator_agent(self):
+        return Agent(
+            role='The Negotiator (Strategic Coach)',
+            goal='Equip the user with a psychological and tactical playbook to win the acceptance of the Final Verdict clauses.',
+            backstory="""You are The Negotiator, a master of high-stakes corporate diplomacy and psychology. 
+            You do not write contracts; you teach people how to sell them. Your job is to take the "Final Verdict" 
+            contract and create a "Battle Script" for the user. You rely heavily on concepts like BATNA 
+            (Best Alternative to a Negotiated Agreement) and ZOPA (Zone of Possible Agreement). 
+            You anticipate the emotional and logical pushback from the Counterparty and provide the User 
+            with bulletproof rebuttals. Your output is not legal text, but a dialogue guide, offering specific 
+            phrasing, psychological cues, and leverage points to help the User close the deal without blowing up the relationship.""",
+            llm=llm,
+            verbose=True,
+            allow_delegation=False
+        )

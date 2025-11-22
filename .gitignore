@@ -2,9 +2,9 @@
 .env
 
 # 2. Virtual Environment (Do not upload library files)
-venv/
+myenv/
 env/
-.venv/
+.myenv/
 
 # 3. Python Cache (Junk files created automatically)
 __pycache__/
