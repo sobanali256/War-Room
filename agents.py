@@ -1,13 +1,18 @@
 from crewai import Agent
-from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
 import os
 from dotenv import load_dotenv
 
 load_dotenv()
 
-llm = ChatOpenAI(
-    model=os.getenv("OPENAI_MODEL_NAME"),
-    api_key=os.getenv("OPENAI_API_KEY")
+# llm = ChatOpenAI(
+#     model=os.getenv("OPENAI_MODEL_NAME") or "gpt-4o-mini",
+#     api_key=os.getenv("OPENAI_API_KEY")
+# )
+
+llm = ChatGoogleGenerativeAI(
+    model=os.getenv("GEMINI_MODEL_NAME") or "gemini-2.0-flash",
+    google_api_key=os.getenv("GEMINI_API_KEY")
 )
 
 class WarRoomAgents:
