@@ -61,7 +61,7 @@ def analyze_contract(contract_text):
     
     # Process first 3000 characters
     chain = prompt | llm
-    response = chain.invoke({"text_snippet": contract_text[:3000]})
+    response = chain.invoke({"text_snippet": contract_text[:10000]})
     
     # Default Safe Fallback
     default_response = {

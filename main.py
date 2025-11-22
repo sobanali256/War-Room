@@ -78,7 +78,7 @@ def get_pdf_text(uploaded_file):
     try:
         pdf_reader = PdfReader(uploaded_file)
         for i, page in enumerate(pdf_reader.pages):
-            if i >= 10: break 
+            if i >= 30: break 
             text += page.extract_text()
     except Exception as e:
         st.error(f"Error reading PDF: {e}")
@@ -183,7 +183,7 @@ if uploaded_file:
                         
                         # Initialize Crew
                         war_room = WarRoomCrew(
-                            st.session_state['contract_text'][:8000], 
+                            st.session_state['contract_text'][:25000], 
                             user_role, 
                             counter_role
                         )
