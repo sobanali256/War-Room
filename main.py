@@ -1,13 +1,14 @@
 import streamlit as st
 import time
 import re
+import sys
 from pypdf import PdfReader
 from fpdf import FPDF
 
 # --- BACKEND IMPORTS ---
 try:
     from crew import WarRoomCrew
-    from utils import analyze_contract
+    from utils import analyze_contract, get_redline_html
 except ImportError:
     st.error("⚠️ Critical Error: 'crew.py' or 'utils.py' not found. Please ensure backend files are in the directory.")
     st.stop()
@@ -35,6 +36,17 @@ st.markdown("""
     .mediator-card { background: linear-gradient(145deg, #0f2615, #09140b); border: 2px solid #21c354; padding: 25px; color: #b8e6b8; }
     .negotiator-card { background: linear-gradient(145deg, #2d2d1d, #1f1f14); border-left: 6px solid #f1c40f; color: #f9e79f; }
     
+    /* Redline Diff Container */
+    .diff-container {
+        background-color: #0e1117; 
+        padding: 20px; 
+        border-radius: 10px; 
+        border: 1px solid #333; 
+        line-height: 1.8; 
+        font-family: 'Courier New', monospace;
+        margin-bottom: 20px;
+    }
+
     /* Role & Dashboard Badges */
     .role-badge { background-color: #262730; padding: 15px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; font-size: 1.1em; text-align: center; border: 1px solid #444; }
     
@@ -55,7 +67,36 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- HELPER FUNCTIONS ---
+# --- HELPER CLASSES & FUNCTIONS ---
+
+class StreamToExpander:
+    """
+    Catches stdout (print statements) and updates a Streamlit expander
+    to show the 'Thought Bubbles' in real-time.
+    """
+    def __init__(self, expander):
+        self.expander = expander
+        self.buffer = []
+        self.full_text = ""
+
+    def write(self, data):
+        # Filter out ANSI color codes using regex
+        cleaned_data = re.sub(r'\x1B\[[0-9;]*[mK]', '', data)
+        if cleaned_data.strip():
+            self.full_text += cleaned_data + "\n"
+            
+            # Detect Agent to add Emoji
+            prefix = "🤖"
+            if "Shark" in cleaned_data: prefix = "🦈 SHARK:"
+            elif "Shield" in cleaned_data: prefix = "🛡️ SHIELD:"
+            elif "Mediator" in cleaned_data: prefix = "⚖️ MEDIATOR:"
+            elif "Negotiator" in cleaned_data: prefix = "🤝 COACH:"
+            
+            # Update the container
+            self.expander.markdown(f"**{prefix}** {cleaned_data.strip()}")
+
+    def flush(self):
+        pass
 
 def clean_text(text):
     """Sanitizes LLM output to remove artifacts."""
@@ -104,6 +145,17 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Upload Contract (PDF)", type=['pdf'])
     
     st.divider()
+    
+    # --- AGGRESSION SLIDER ---
+    st.header("⚙️ Simulation Settings")
+    aggression_mode = st.select_slider(
+        "🦈 Shark Aggression Level",
+        options=["Diplomat", "Professional", "Killer"],
+        value="Professional",
+        help="Diplomat = Polite | Professional = Standard | Killer = Ruthless"
+    )
+    
+    st.divider()
     if st.button("🔄 Start New Negotiation", use_container_width=True):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
@@ -119,7 +171,7 @@ if uploaded_file:
             if text:
                 st.session_state['contract_text'] = text
                 
-                # CALL BACKEND: Analyze Contract (Send first 10k chars for risk analysis)
+                # CALL BACKEND: Analyze Contract (Send first 10k chars)
                 try:
                     analysis_result = analyze_contract(text[:10000]) 
                     st.session_state['roles'] = analysis_result.get('roles', {})
@@ -166,29 +218,41 @@ if uploaded_file:
         
         if 'simulation_results' not in st.session_state:
             if st.button("🚀 Enter The Arena (Run AI Agents)", type="primary", use_container_width=True):
-                with st.spinner("🧠 Agents are debating & drafting strategy..."):
-                    try:
-                        user_role = roles.get('user_role', 'Tenant')
-                        counter_role = roles.get('counter_party', 'Landlord')
-                        
-                        # Initialize Crew with INCREASED Character Limit (25k)
-                        war_room = WarRoomCrew(
-                            st.session_state['contract_text'][:25000], 
-                            user_role, 
-                            counter_role
-                        )
-                        # Run Crew
-                        result = war_room.run()
-                        st.session_state['simulation_results'] = result
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Simulation Error: {e}")
+                
+                # --- LIVE FEED CONTAINER ---
+                status_box = st.status("🧠 Agents are debating strategies...", expanded=True)
+                
+                try:
+                    # Redirect stdout to our custom class
+                    sys.stdout = StreamToExpander(status_box)
+                    
+                    user_role = roles.get('user_role', 'Tenant')
+                    counter_role = roles.get('counter_party', 'Landlord')
+                    
+                    # Initialize Crew with Slider Value & Increased Limit
+                    war_room = WarRoomCrew(
+                        st.session_state['contract_text'][:25000], 
+                        user_role, 
+                        counter_role,
+                        aggression_mode 
+                    )
+                    # Run Crew
+                    result = war_room.run()
+                    st.session_state['simulation_results'] = result
+                    
+                    # Reset stdout
+                    sys.stdout = sys.__stdout__
+                    status_box.update(label="✅ Negotiation Complete!", state="complete", expanded=False)
+                    st.rerun()
+                    
+                except Exception as e:
+                    st.error(f"Simulation Error: {e}")
+                    sys.stdout = sys.__stdout__ # Safety reset
 
-        # 4. DISPLAY RESULTS (4 TABS)
+        # 4. DISPLAY RESULTS
         if 'simulation_results' in st.session_state:
             results = st.session_state['simulation_results']
             
-            # Handle dictionary vs string output
             if isinstance(results, dict):
                 shark_text = clean_text(results.get('shark_report', "No report generated."))
                 shield_text = clean_text(results.get('shield_report', "No report generated."))
@@ -213,9 +277,52 @@ if uploaded_file:
 
             with tab_mediator:
                 st.markdown("#### 🟢 Final Consensus")
-                st.markdown(f"<div class='st-card mediator-card'>{verdict_text}</div>", unsafe_allow_html=True)
+                
+                verdict_content = verdict_text
+                
+                # --- MULTI-CLAUSE REDLINE VISUALIZER ---
+                pattern = r"---CLAUSE_COMPARISON_START---(.*?)---CLAUSE_COMPARISON_END---"
+                matches = list(re.finditer(pattern, verdict_content, re.DOTALL))
+                
+                if matches:
+                    st.markdown("### 📝 Clause Redlines (AI Auto-Diff)")
+                    st.caption(f"Visualizing {len(matches)} specific changes made to the contract.")
+                    
+                    for idx, match in enumerate(matches):
+                        block = match.group(1).strip()
+                        try:
+                            parts = block.split("REVISED:")
+                            original_part = parts[0].replace("ORIGINAL:", "").strip()
+                            
+                            remaining = parts[1]
+                            if "EXPLANATION:" in remaining:
+                                subparts = remaining.split("EXPLANATION:")
+                                revised_part = subparts[0].strip()
+                                explanation = subparts[1].strip()
+                            else:
+                                revised_part = remaining.strip()
+                                explanation = "No explanation provided."
+
+                            diff_html = get_redline_html(original_part, revised_part)
+                            
+                            with st.expander(f"Change #{idx+1}: {explanation[:60]}..."):
+                                st.markdown(f"**Reasoning:** *{explanation}*")
+                                st.markdown(f"<div class='diff-container'>{diff_html}</div>", unsafe_allow_html=True)
+                                
+                        except Exception as e:
+                            print(f"Parsing error on match {idx}: {e}")
+                            
+                    # Cleanup Text for display
+                    for match in reversed(matches):
+                        verdict_content = verdict_content.replace(match.group(0), "")
+                        verdict_content = verdict_content.replace("---CLAUSE_COMPARISON_START---", "")
+                        verdict_content = verdict_content.replace("---CLAUSE_COMPARISON_END---", "")
+
+                # Display Clean Text
+                st.markdown(f"<div class='st-card mediator-card'>{verdict_content}</div>", unsafe_allow_html=True)
+                
                 st.divider()
-                pdf_data = create_pdf(verdict_text)
+                pdf_data = create_pdf(verdict_content)
                 st.download_button(
                     label="📥 Download Final Verdict (PDF)",
                     data=pdf_data,

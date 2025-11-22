@@ -4,16 +4,18 @@ from tasks import WarRoomTasks
 import os
 
 class WarRoomCrew:
-    def __init__(self, contract_text, user_role="The User", counter_party="The Counterparty"):
+    def __init__(self, contract_text, user_role="The User", counter_party="The Counterparty", aggression_mode="Professional"):
         self.contract_text = contract_text
         self.user_role = user_role
         self.counter_party = counter_party
+        self.aggression_mode = aggression_mode  # <--- Store the slider value
         self.agents = WarRoomAgents()
         self.tasks = WarRoomTasks()
 
     def run(self):
         # 1. Init Agents
-        shark = self.agents.shark_agent(self.counter_party)
+        # We pass the aggression_mode to the Shark here
+        shark = self.agents.shark_agent(self.counter_party, self.aggression_mode)
         shield = self.agents.shield_agent(self.user_role)
         mediator = self.agents.mediator_agent()
         negotiator = self.agents.negotiator_agent()
@@ -24,7 +26,7 @@ class WarRoomCrew:
         verdict = self.tasks.verdict_task(mediator, self.contract_text, [attack, defense])
         negotiation = self.tasks.negotiation_task(negotiator, [verdict], self.user_role, self.counter_party)
 
-        # 3. Run Crew (Sequential Flow)
+        # 3. Run Crew
         crew = Crew(
             agents=[shark, shield, mediator, negotiator],
             tasks=[attack, defense, verdict, negotiation],

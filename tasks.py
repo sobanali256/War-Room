@@ -45,10 +45,21 @@ class WarRoomTasks:
             2. Determine which arguments are legally valid and commercially reasonable.
             3. Draft a final version that creates a fair, market-standard structure.
             4. Ensure the final clauses withstand legal scrutiny and practical application.
+           IMPORTANT FINAL STEP:
+            For EVERY clause you rewrote or modified, you must provide a structured comparison at the very bottom of your report. 
+            Use the exact format below for EACH clause:
+            
+            ---CLAUSE_COMPARISON_START---
+            ORIGINAL: [Insert the exact original text of the clause]
+            REVISED: [Insert your new fair version]
+            EXPLANATION: [One sentence explaining why you changed it]
+            ---CLAUSE_COMPARISON_END---
+            
+            (Repeat this block for as many clauses as you modified).
             """,
             agent=agent,
             context=context,
-            expected_output="A Final Verdict explaining the compromise and providing the specific, rewritten contract clauses that represent the optimal midpoint.",
+            expected_output="A Final Verdict + A strict Original vs Revised comparison block at the end explaining the compromise and providing the specific, rewritten contract clauses that represent the optimal midpoint.",
             output_file=os.path.join(os.getcwd(), "verdict_output.md")
         )
     
