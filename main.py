@@ -71,8 +71,8 @@ st.markdown("""
 
 class StreamToExpander:
     """
-    Catches stdout (print statements) and updates a Streamlit expander
-    to show the 'Thought Bubbles' in real-time.
+    Robust stdout wrapper that handles Streamlit threading issues
+    and mocks a real file object to prevent internal crashes.
     """
     def __init__(self, expander):
         self.expander = expander
@@ -80,23 +80,36 @@ class StreamToExpander:
         self.full_text = ""
 
     def write(self, data):
-        # Filter out ANSI color codes using regex
+        # 1. Clean ANSI codes
         cleaned_data = re.sub(r'\x1B\[[0-9;]*[mK]', '', data)
+        
+        # 2. Only update if there is actual text
         if cleaned_data.strip():
             self.full_text += cleaned_data + "\n"
             
-            # Detect Agent to add Emoji
+            # 3. Detect Agent
             prefix = "🤖"
             if "Shark" in cleaned_data: prefix = "🦈 SHARK:"
             elif "Shield" in cleaned_data: prefix = "🛡️ SHIELD:"
             elif "Mediator" in cleaned_data: prefix = "⚖️ MEDIATOR:"
             elif "Negotiator" in cleaned_data: prefix = "🤝 COACH:"
             
-            # Update the container
-            self.expander.markdown(f"**{prefix}** {cleaned_data.strip()}")
+            # 4. SAFE UPDATE: Try/Except to prevent crashing the whole app
+            try:
+                self.expander.markdown(f"**{prefix}** {cleaned_data.strip()}")
+            except Exception:
+                pass
 
     def flush(self):
         pass
+
+    # --- CRITICAL FIXES FOR STREAMLIT COMPATIBILITY ---
+    def isatty(self):
+        return False  
+
+    @property
+    def encoding(self):
+        return 'utf-8'
 
 def clean_text(text):
     """Sanitizes LLM output to remove artifacts."""
@@ -112,7 +125,7 @@ def get_pdf_text(uploaded_file):
     try:
         pdf_reader = PdfReader(uploaded_file)
         for i, page in enumerate(pdf_reader.pages):
-            if i >= 30: break # Increased limit
+            if i >= 30: break 
             text += page.extract_text()
     except Exception as e:
         st.error(f"Error reading PDF: {e}")
@@ -171,7 +184,6 @@ if uploaded_file:
             if text:
                 st.session_state['contract_text'] = text
                 
-                # CALL BACKEND: Analyze Contract (Send first 10k chars)
                 try:
                     analysis_result = analyze_contract(text[:10000]) 
                     st.session_state['roles'] = analysis_result.get('roles', {})
@@ -180,7 +192,6 @@ if uploaded_file:
                     st.error(f"Backend Analysis Failed: {e}")
                     st.stop()
     
-    # Ensure we have data before rendering
     if 'roles' in st.session_state and 'risk_scores' in st.session_state:
         roles = st.session_state['roles']
         scores = st.session_state['risk_scores']
@@ -221,15 +232,16 @@ if uploaded_file:
                 
                 # --- LIVE FEED CONTAINER ---
                 status_box = st.status("🧠 Agents are debating strategies...", expanded=True)
+                original_stdout = sys.stdout 
                 
                 try:
-                    # Redirect stdout to our custom class
+                    # Redirect stdout
                     sys.stdout = StreamToExpander(status_box)
                     
                     user_role = roles.get('user_role', 'Tenant')
                     counter_role = roles.get('counter_party', 'Landlord')
                     
-                    # Initialize Crew with Slider Value & Increased Limit
+                    # Initialize Crew
                     war_room = WarRoomCrew(
                         st.session_state['contract_text'][:25000], 
                         user_role, 
@@ -240,14 +252,18 @@ if uploaded_file:
                     result = war_room.run()
                     st.session_state['simulation_results'] = result
                     
-                    # Reset stdout
-                    sys.stdout = sys.__stdout__
                     status_box.update(label="✅ Negotiation Complete!", state="complete", expanded=False)
-                    st.rerun()
                     
                 except Exception as e:
                     st.error(f"Simulation Error: {e}")
-                    sys.stdout = sys.__stdout__ # Safety reset
+                
+                finally:
+                    # RESTORE TERMINAL TO PREVENT CRASHES
+                    sys.stdout = original_stdout
+                
+                # Trigger Rerun
+                if 'simulation_results' in st.session_state:
+                    st.rerun()
 
         # 4. DISPLAY RESULTS
         if 'simulation_results' in st.session_state:
