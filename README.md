@@ -74,5 +74,3 @@ The system utilizes **CrewAI** to manage a sequential adversarial process:
 ## 📄 License
 Distributed under the MIT License. See `LICENSE` for more information.
 
----
-*Built for the [Hackathon Name] 2025.*
