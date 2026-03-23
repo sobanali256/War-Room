@@ -1,6 +1,5 @@
 crewai>=0.100.0
 langchain-openai
-langchain
 python-dotenv
 streamlit
 pypdf
